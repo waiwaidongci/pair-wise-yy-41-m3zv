@@ -89,6 +89,16 @@ def make_handler(service: Service, static_dir: str):
                     actor, role = self._identity()
                     del actor
                     self._json(200, {"records": service.list_records(item_id, role)})
+                elif path.startswith("/api/items/") and path.endswith("/readings"):
+                    item_id = int(path.split("/")[3])
+                    actor, role = self._identity()
+                    del actor
+                    self._json(200, service.list_readings(item_id, role))
+                elif path.startswith("/api/items/") and path.endswith("/reviews"):
+                    item_id = int(path.split("/")[3])
+                    actor, role = self._identity()
+                    del actor
+                    self._json(200, {"reviews": service.list_reviews(item_id, role)})
                 elif path.startswith("/api/items/"):
                     item_id = int(path.rsplit("/", 1)[-1])
                     actor, role = self._identity()
@@ -110,6 +120,19 @@ def make_handler(service: Service, static_dir: str):
                 body = self._body()
                 if path == "/api/items":
                     self._json(201, service.create_item(body, actor, role))
+                elif path.startswith("/api/items/") and path.endswith("/readings"):
+                    item_id = int(path.split("/")[3])
+                    self._json(201, service.submit_reading(item_id, body, actor, role))
+                elif path.startswith("/api/items/") and path.endswith("/reviews"):
+                    item_id = int(path.split("/")[3])
+                    self._json(201, service.manual_review(item_id, body, actor, role))
+                elif (path.startswith("/api/items/")
+                      and "/records/" in path and path.endswith("/close")):
+                    parts = path.split("/")
+                    item_id = int(parts[3])
+                    record_id = int(parts[5])
+                    self._json(200, service.close_record(
+                        item_id, record_id, actor, role))
                 elif path.startswith("/api/items/") and path.endswith("/records"):
                     item_id = int(path.split("/")[3])
                     self._json(201, service.add_record(item_id, body, actor, role))
@@ -118,7 +141,7 @@ def make_handler(service: Service, static_dir: str):
                     target = body.get("target")
                     expected = body.get("expected_version")
                     self._json(200, service.transition(
-                        item_id, target, expected, actor, role))
+                        item_id, target, expected, actor, role, body))
                 else:
                     self._json(404, {"error": "not_found"})
             except Exception as exc:
