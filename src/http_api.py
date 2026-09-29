@@ -14,6 +14,12 @@ from .service import Service
 def make_handler(service: Service, static_dir: str):
     root = Path(static_dir)
 
+    def parse_id(value: str) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError) as exc:
+            raise NotFoundError("资源不存在") from exc
+
     class Handler(BaseHTTPRequestHandler):
         server_version = "ModularHell/1.0"
 
@@ -85,12 +91,32 @@ def make_handler(service: Service, static_dir: str):
                     del actor
                     self._json(200, {"items": service.list_items(role)})
                 elif path.startswith("/api/items/") and path.endswith("/records"):
-                    item_id = int(path.split("/")[3])
+                    parts = path.strip("/").split("/")
+                    item_id = parse_id(parts[2])
                     actor, role = self._identity()
                     del actor
                     self._json(200, {"records": service.list_records(item_id, role)})
+                elif path.startswith("/api/items/") and path.endswith("/readings"):
+                    parts = path.strip("/").split("/")
+                    item_id = parse_id(parts[2])
+                    actor, role = self._identity()
+                    del actor
+                    status = parse_qs(urlparse(self.path).query).get("status", [None])[0]
+                    self._json(200, {"readings": service.list_readings(item_id, role, status)})
+                elif path.startswith("/api/items/") and path.endswith("/baselines"):
+                    parts = path.strip("/").split("/")
+                    item_id = parse_id(parts[2])
+                    actor, role = self._identity()
+                    del actor
+                    self._json(200, {"baselines": service.list_baselines(item_id, role)})
+                elif "/alarms/" in path:
+                    parts = path.strip("/").split("/")
+                    item_id = parse_id(parts[2]); alarm_id = parse_id(parts[4])
+                    actor, role = self._identity()
+                    del actor
+                    self._json(200, service.get_alarm(item_id, alarm_id, role))
                 elif path.startswith("/api/items/"):
-                    item_id = int(path.rsplit("/", 1)[-1])
+                    item_id = parse_id(path.rsplit("/", 1)[-1])
                     actor, role = self._identity()
                     del actor
                     self._json(200, service.get_item(item_id, role))
@@ -110,11 +136,28 @@ def make_handler(service: Service, static_dir: str):
                 body = self._body()
                 if path == "/api/items":
                     self._json(201, service.create_item(body, actor, role))
+                elif path.startswith("/api/items/") and path.endswith("/readings"):
+                    item_id = parse_id(path.split("/")[3])
+                    self._json(201, service.submit_reading(item_id, body, actor, role))
+                elif path.startswith("/api/items/") and path.endswith("/baselines"):
+                    item_id = parse_id(path.split("/")[3])
+                    self._json(201, service.add_baseline(item_id, body, actor, role))
+                elif path.startswith("/api/items/") and path.endswith("/traffic-notices"):
+                    item_id = parse_id(path.split("/")[3])
+                    self._json(201, service.add_traffic_notice(item_id, body, actor, role))
+                elif "/traffic-notices/" in path:
+                    parts = path.strip("/").split("/")
+                    item_id = parse_id(parts[2]); record_id = parse_id(parts[4])
+                    self._json(200, service.lift_traffic_notice(item_id, record_id, actor, role))
+                elif "/alarms/" in path and path.endswith("/review"):
+                    parts = path.strip("/").split("/")
+                    item_id = parse_id(parts[2]); alarm_id = parse_id(parts[4])
+                    self._json(200, service.review_alarm(item_id, alarm_id, body, actor, role))
                 elif path.startswith("/api/items/") and path.endswith("/records"):
-                    item_id = int(path.split("/")[3])
+                    item_id = parse_id(path.split("/")[3])
                     self._json(201, service.add_record(item_id, body, actor, role))
                 elif path.startswith("/api/items/") and path.endswith("/transition"):
-                    item_id = int(path.split("/")[3])
+                    item_id = parse_id(path.split("/")[3])
                     target = body.get("target")
                     expected = body.get("expected_version")
                     self._json(200, service.transition(

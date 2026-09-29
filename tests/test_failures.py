@@ -8,6 +8,7 @@ class FailureTest(unittest.TestCase):
     def setUp(self):
         self.tmp=tempfile.TemporaryDirectory(); self.repo=Repository(str(Path(self.tmp.name)/"test.db")); self.service=Service(self.repo)
         self.item=self.service.create_item({"title":"failure item","description":"failure scenarios","severity":'warning',"quantity":5,"threshold":10,"external_ref":"FAIL-1"},"creator",'sensor_operator')
+        self.service.add_traffic_notice(self.item["id"],{"detail":"封闭通告","external_ref":"FAIL-TN"},"ta",'traffic_authority')
     def tearDown(self): self.repo.close(); self.tmp.cleanup()
     def test_permission_version_duplicate_and_invariant(self):
         with self.assertRaises(PermissionDenied): self.service.transition(self.item["id"],STATES[1],1,"attacker","viewer")
